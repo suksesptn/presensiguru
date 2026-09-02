@@ -11,9 +11,7 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: {
-                        sans: ['Poppins', 'sans-serif'],
-                    },
+                    fontFamily: { sans: ['Poppins', 'sans-serif'] },
                     colors: {
                         primary: '#059669',
                         primaryDark: '#047857',
@@ -29,15 +27,6 @@
             background-color: #059669;
             border-color: #059669;
             color: white;
-        }
-        .loading-skeleton {
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-        }
-        @keyframes loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
         }
     </style>
 </head>
@@ -113,9 +102,6 @@
                             class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-emerald-200 outline-none transition-all bg-slate-50">
                             <option value="" disabled selected>Pilih Mapel...</option>
                         </select>
-                        <div id="mapelLoading" class="hidden mt-2">
-                            <div class="h-12 rounded-lg loading-skeleton"></div>
-                        </div>
                     </div>
 
                     <!-- Nama Guru -->
@@ -127,9 +113,6 @@
                             class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-emerald-200 outline-none transition-all bg-slate-50">
                             <option value="" disabled selected>Pilih Mata Pelajaran terlebih dahulu</option>
                         </select>
-                        <div id="guruLoading" class="hidden mt-2">
-                            <div class="h-12 rounded-lg loading-skeleton"></div>
-                        </div>
                     </div>
 
                     <!-- Kelas -->
@@ -141,9 +124,6 @@
                             class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-emerald-200 outline-none transition-all bg-slate-50">
                             <option value="" disabled selected>Pilih Kelas...</option>
                         </select>
-                        <div id="kelasLoading" class="hidden mt-2">
-                            <div class="h-12 rounded-lg loading-skeleton"></div>
-                        </div>
                     </div>
 
                     <!-- Jumlah JP -->
@@ -187,12 +167,11 @@
                 <div class="mt-5 pt-5 border-t border-slate-100">
                     <label class="block text-sm font-semibold text-slate-700 mb-2">
                         <i data-lucide="user-plus" class="w-4 h-4 inline mr-1"></i>
-                        Tambah Siswa Manual (pisahkan dengan koma jika lebih dari 1)
+                        Tambah Siswa Manual (pisahkan dengan koma)
                     </label>
                     <textarea id="siswaManual" name="siswaManual" rows="2" 
                         placeholder="Contoh: Ahmad Fauzi, Budi Santoso"
                         class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-emerald-200 outline-none transition-all bg-slate-50 resize-none text-sm"></textarea>
-                    <p class="text-xs text-slate-500 mt-1">* Siswa yang ditambahkan manual akan otomatis dianggap hadir</p>
                 </div>
 
                 <!-- Statistik -->
@@ -239,22 +218,13 @@
     </div>
 
     <script>
-        // ============================================
-        // URL APPS SCRIPT - GANTI JIKA PERLU
-        // ============================================
+        // URL Apps Script
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbydQLyp6LkW3Nvu1kyQ9v_n0FZfi-dAAzsoCCXEzUXZ18sUcYoljAmXxaPR5YTAK41QfQ/exec";
         
-        // Initialize
         lucide.createIcons();
         document.getElementById('tanggal').valueAsDate = new Date();
 
-        // State management
-        let currentData = {
-            guru: [],
-            siswa: [],
-            kelas: [],
-            mapel: []
-        };
+        let currentData = { guru: [], siswa: [], kelas: [], mapel: [] };
 
         // Event Listeners
         document.getElementById('jenis').addEventListener('change', handleJenisChange);
@@ -267,45 +237,36 @@
         async function handleJenisChange() {
             const jenis = this.value;
             
-            // Hide all dependent fields
+            // Reset fields
             document.getElementById('mapelContainer').classList.add('hidden');
             document.getElementById('guruContainer').classList.add('hidden');
             document.getElementById('kelasContainer').classList.add('hidden');
             document.getElementById('jpContainer').classList.add('hidden');
             document.getElementById('kehadiranContainer').classList.add('hidden');
             
-            // Reset values
-            document.getElementById('mapel').innerHTML = '<option value="" disabled selected>Pilih Mapel...</option>';
-            document.getElementById('guru').innerHTML = '<option value="" disabled selected>Pilih Mata Pelajaran terlebih dahulu</option>';
-            document.getElementById('kelas').innerHTML = '<option value="" disabled selected>Pilih Kelas...</option>';
-            
-            // Load data based on jenis
             if (jenis && ['TKA', 'SNBT', 'IUP', 'Ujian Mandiri'].includes(jenis)) {
-                showLoading('mapelLoading');
                 try {
-                    const data = await google.script.run.withSuccessHandler(onDataLoaded).getDataPresensi(jenis);
+                    const response = await fetch(`${APPS_SCRIPT_URL}?action=getDataPresensi&jenis=${jenis}`);
+                    const data = await response.json();
+                    
                     if (data.error) {
                         showNotification('error', 'Error', data.error);
+                    } else {
+                        currentData = data;
+                        populateMapel(data.mapel);
+                        populateKelas(data.kelas);
+                        currentData.siswa = data.siswa;
+                        currentData.guru = data.guru;
+                        document.getElementById('mapelContainer').classList.remove('hidden');
                     }
                 } catch (error) {
                     showNotification('error', 'Error', 'Gagal memuat data');
-                } finally {
-                    hideLoading('mapelLoading');
+                    console.error(error);
                 }
             } else {
-                // For non-intensif types, show simpler form
                 document.getElementById('guruContainer').classList.remove('hidden');
                 document.getElementById('jpContainer').classList.remove('hidden');
             }
-        }
-
-        function onDataLoaded(data) {
-            currentData = data;
-            populateMapel(data.mapel);
-            populateKelas(data.kelas);
-            currentData.siswa = data.siswa;
-            currentData.guru = data.guru;
-            document.getElementById('mapelContainer').classList.remove('hidden');
         }
 
         function populateMapel(mapelList) {
@@ -334,28 +295,25 @@
             const jenis = document.getElementById('jenis').value;
             const mapel = this.value;
             
-            document.getElementById('guruContainer').classList.add('hidden');
-            
             if (mapel) {
-                showLoading('guruLoading');
                 try {
-                    const guruList = await google.script.run.withSuccessHandler((gurus) => {
-                        const select = document.getElementById('guru');
-                        select.innerHTML = '<option value="" disabled selected>Pilih Guru...</option>';
-                        gurus.forEach(guru => {
-                            const option = document.createElement('option');
-                            option.value = guru;
-                            option.textContent = guru;
-                            select.appendChild(option);
-                        });
-                        document.getElementById('guruContainer').classList.remove('hidden');
-                        document.getElementById('kelasContainer').classList.remove('hidden');
-                        document.getElementById('jpContainer').classList.remove('hidden');
-                    }).getGuruByMapel(jenis, mapel);
+                    const response = await fetch(`${APPS_SCRIPT_URL}?action=getGuruByMapel&jenis=${jenis}&mapel=${encodeURIComponent(mapel)}`);
+                    const data = await response.json();
+                    
+                    const select = document.getElementById('guru');
+                    select.innerHTML = '<option value="" disabled selected>Pilih Guru...</option>';
+                    data.guru.forEach(guru => {
+                        const option = document.createElement('option');
+                        option.value = guru;
+                        option.textContent = guru;
+                        select.appendChild(option);
+                    });
+                    
+                    document.getElementById('guruContainer').classList.remove('hidden');
+                    document.getElementById('kelasContainer').classList.remove('hidden');
+                    document.getElementById('jpContainer').classList.remove('hidden');
                 } catch (error) {
                     showNotification('error', 'Error', 'Gagal memuat data guru');
-                } finally {
-                    hideLoading('guruLoading');
                 }
             }
         }
@@ -366,11 +324,12 @@
             
             if (kelas) {
                 try {
-                    const siswaList = await google.script.run.withSuccessHandler((siswas) => {
-                        renderSiswaList(siswas);
-                        document.getElementById('kehadiranContainer').classList.remove('hidden');
-                        updateStatistik();
-                    }).getSiswaByKelas(jenis, kelas);
+                    const response = await fetch(`${APPS_SCRIPT_URL}?action=getSiswaByKelas&jenis=${jenis}&kelas=${encodeURIComponent(kelas)}`);
+                    const data = await response.json();
+                    
+                    renderSiswaList(data.siswa);
+                    document.getElementById('kehadiranContainer').classList.remove('hidden');
+                    updateStatistik();
                 } catch (error) {
                     showNotification('error', 'Error', 'Gagal memuat data siswa');
                 }
@@ -395,11 +354,9 @@
                 div.innerHTML = `
                     <label class="flex items-center gap-3 flex-1 cursor-pointer">
                         <input type="checkbox" name="siswaHadir" value="${siswa}" 
-                            class="checkbox-custom sr-only" 
-                            onchange="updateStatistik()"
-                            id="siswa_${index}">
-                        <div class="w-5 h-5 border-2 border-slate-300 rounded flex items-center justify-center transition-all checkbox-wrapper">
-                            <i data-lucide="check" class="w-3.5 h-3.5 opacity-0 transition-opacity check-icon"></i>
+                            class="checkbox-custom sr-only" onchange="updateStatistik()" id="siswa_${index}">
+                        <div class="w-5 h-5 border-2 border-slate-300 rounded flex items-center justify-center transition-all">
+                            <i data-lucide="check" class="w-3.5 h-3.5 opacity-0 check-icon"></i>
                         </div>
                         <span class="font-medium text-slate-700">${siswa}</span>
                     </label>
@@ -415,9 +372,7 @@
                 });
                 
                 const checkbox = div.querySelector('input[type="checkbox"]');
-                checkbox.addEventListener('change', () => {
-                    updateCheckboxUI(checkbox);
-                });
+                checkbox.addEventListener('change', () => updateCheckboxUI(checkbox));
                 
                 container.appendChild(div);
             });
@@ -426,7 +381,7 @@
         }
 
         function updateCheckboxUI(checkbox) {
-            const wrapper = checkbox.parentElement.nextElementSibling || checkbox.parentElement.querySelector('.checkbox-wrapper');
+            const wrapper = checkbox.parentElement.nextElementSibling;
             const icon = wrapper.querySelector('.check-icon');
             
             if (checkbox.checked) {
@@ -442,69 +397,45 @@
 
         function handleSearchSiswa() {
             const searchTerm = this.value.toLowerCase();
-            const items = document.querySelectorAll('.siswa-item');
-            
-            items.forEach(item => {
+            document.querySelectorAll('.siswa-item').forEach(item => {
                 const nama = item.querySelector('span').textContent.toLowerCase();
-                if (nama.includes(searchTerm)) {
-                    item.style.display = 'flex';
-                } else {
-                    item.style.display = 'none';
-                }
+                item.style.display = nama.includes(searchTerm) ? 'flex' : 'none';
             });
         }
 
         function updateStatistik() {
-            const checkboxes = document.querySelectorAll('input[name="siswaHadir"]:checked');
-            const totalSiswa = document.querySelectorAll('.siswa-item').length;
-            const hadir = checkboxes.length;
-            const tidakHadir = totalSiswa - hadir;
-            
+            const hadir = document.querySelectorAll('input[name="siswaHadir"]:checked').length;
+            const total = document.querySelectorAll('.siswa-item').length;
             document.getElementById('statHadir').textContent = hadir;
-            document.getElementById('statTidakHadir').textContent = tidakHadir;
+            document.getElementById('statTidakHadir').textContent = total - hadir;
         }
 
         async function handleSubmit(e) {
             e.preventDefault();
             
             const submitBtn = document.getElementById('submitBtn');
-            const originalBtnContent = submitBtn.innerHTML;
-            
-            const jenis = document.getElementById('jenis').value;
-            if (!jenis) {
-                showNotification('error', 'Validasi', 'Pilih jenis presensi');
-                return;
-            }
+            const originalContent = submitBtn.innerHTML;
             
             const hadirCheckboxes = document.querySelectorAll('input[name="siswaHadir"]:checked');
             const siswaHadir = Array.from(hadirCheckboxes).map(cb => cb.value);
             
-            const semuaSiswaItems = document.querySelectorAll('.siswa-item input[name="siswaHadir"]');
-            const semuaSiswa = Array.from(semuaSiswaItems).map(cb => cb.value);
+            const semuaSiswa = Array.from(document.querySelectorAll('.siswa-item input[name="siswaHadir"]')).map(cb => cb.value);
             const siswaTidakHadir = semuaSiswa.filter(s => !siswaHadir.includes(s));
             
-            const siswaManual = document.getElementById('siswaManual').value;
-            
             const formData = {
-                jenis: jenis,
+                jenis: document.getElementById('jenis').value,
                 tanggal: document.getElementById('tanggal').value,
                 mapel: document.getElementById('mapel').value || '',
                 guru: document.getElementById('guru').value,
                 kelas: document.getElementById('kelas').value || '',
                 jp: document.getElementById('jp').value,
-                siswaHadir: siswaHadir,
-                siswaTidakHadir: siswaTidakHadir,
-                siswaManual: siswaManual
+                siswaHadir,
+                siswaTidakHadir,
+                siswaManual: document.getElementById('siswaManual').value
             };
             
             submitBtn.disabled = true;
-            submitBtn.innerHTML = `
-                <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Menyimpan...</span>
-            `;
+            submitBtn.innerHTML = '<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Menyimpan...</span>';
             
             try {
                 const response = await fetch(APPS_SCRIPT_URL, {
@@ -515,18 +446,17 @@
                 const result = await response.json();
                 
                 if (result.status === 'success') {
-                    showNotification('success', 'Berhasil!', 
-                        `Presensi tersimpan!<br>Hadir: ${result.totalHadir || siswaHadir.length} | Tidak Hadir: ${result.totalTidakHadir || siswaTidakHadir.length}`);
+                    showNotification('success', 'Berhasil!', `Presensi tersimpan!<br>Hadir: ${result.totalHadir || siswaHadir.length} | Tidak Hadir: ${result.totalTidakHadir || siswaTidakHadir.length}`);
                     handleReset();
                 } else {
                     showNotification('error', 'Gagal', result.message);
                 }
             } catch (error) {
-                showNotification('error', 'Error', 'Terjadi kesalahan saat menyimpan data');
+                showNotification('error', 'Error', 'Terjadi kesalahan saat menyimpan');
                 console.error(error);
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = originalBtnContent;
+                submitBtn.innerHTML = originalContent;
                 lucide.createIcons();
             }
         }
@@ -535,54 +465,36 @@
             document.getElementById('presensiForm').reset();
             document.getElementById('tanggal').valueAsDate = new Date();
             document.getElementById('jenis').value = '';
-            
             document.getElementById('mapelContainer').classList.add('hidden');
             document.getElementById('guruContainer').classList.add('hidden');
             document.getElementById('kelasContainer').classList.add('hidden');
             document.getElementById('jpContainer').classList.add('hidden');
             document.getElementById('kehadiranContainer').classList.add('hidden');
-            
             document.getElementById('siswaList').innerHTML = '<p class="text-center text-slate-400 py-8">Pilih kelas untuk menampilkan daftar siswa</p>';
             document.getElementById('statHadir').textContent = '0';
             document.getElementById('statTidakHadir').textContent = '0';
             document.getElementById('totalSiswa').textContent = '0';
-            
             currentData = { guru: [], siswa: [], kelas: [], mapel: [] };
         }
 
         function showNotification(type, title, message) {
             const notif = document.getElementById('notification');
             const icon = document.getElementById('notifIcon');
-            const notifTitle = document.getElementById('notifTitle');
-            const notifMessage = document.getElementById('notifMessage');
             
             notif.classList.remove('hidden');
+            icon.innerHTML = type === 'success' 
+                ? '<div class="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center"><i data-lucide="check" class="w-5 h-5 text-emerald-600"></i></div>'
+                : '<div class="w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center"><i data-lucide="x" class="w-5 h-5 text-rose-600"></i></div>';
             
-            if (type === 'success') {
-                icon.innerHTML = '<div class="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-5 h-5 text-emerald-600"></i></div>';
-            } else {
-                icon.innerHTML = '<div class="w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center flex-shrink-0"><i data-lucide="x" class="w-5 h-5 text-rose-600"></i></div>';
-            }
-            
-            notifTitle.textContent = title;
-            notifMessage.innerHTML = message;
+            document.getElementById('notifTitle').textContent = title;
+            document.getElementById('notifMessage').innerHTML = message;
             lucide.createIcons();
             
-            setTimeout(() => {
-                closeNotification();
-            }, 5000);
+            setTimeout(() => closeNotification(), 5000);
         }
 
         function closeNotification() {
             document.getElementById('notification').classList.add('hidden');
-        }
-
-        function showLoading(elementId) {
-            document.getElementById(elementId).classList.remove('hidden');
-        }
-
-        function hideLoading(elementId) {
-            document.getElementById(elementId).classList.add('hidden');
         }
     </script>
 </body>
