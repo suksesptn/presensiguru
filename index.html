@@ -24,6 +24,7 @@
         }
     </script>
     <style>
+        body { font-family: 'Poppins', sans-serif; }
         .checkbox-custom:checked + div {
             background-color: #059669;
             border-color: #059669;
@@ -238,9 +239,13 @@
     </div>
 
     <script>
-        lucide.createIcons();
+        // ============================================
+        // URL APPS SCRIPT - GANTI JIKA PERLU
+        // ============================================
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbydQLyp6LkW3Nvu1kyQ9v_n0FZfi-dAAzsoCCXEzUXZ18sUcYoljAmXxaPR5YTAK41QfQ/exec";
         
-        // Set tanggal hari ini
+        // Initialize
+        lucide.createIcons();
         document.getElementById('tanggal').valueAsDate = new Date();
 
         // State management
@@ -281,10 +286,6 @@
                     const data = await google.script.run.withSuccessHandler(onDataLoaded).getDataPresensi(jenis);
                     if (data.error) {
                         showNotification('error', 'Error', data.error);
-                    } else {
-                        currentData = data;
-                        populateMapel(data.mapel);
-                        document.getElementById('mapelContainer').classList.remove('hidden');
                     }
                 } catch (error) {
                     showNotification('error', 'Error', 'Gagal memuat data');
@@ -304,6 +305,7 @@
             populateKelas(data.kelas);
             currentData.siswa = data.siswa;
             currentData.guru = data.guru;
+            document.getElementById('mapelContainer').classList.remove('hidden');
         }
 
         function populateMapel(mapelList) {
@@ -363,7 +365,6 @@
             const kelas = this.value;
             
             if (kelas) {
-                showLoading('siswaList');
                 try {
                     const siswaList = await google.script.run.withSuccessHandler((siswas) => {
                         renderSiswaList(siswas);
@@ -404,7 +405,6 @@
                     </label>
                 `;
                 
-                // Toggle checkbox when clicking the div
                 div.addEventListener('click', (e) => {
                     if (e.target.type !== 'checkbox') {
                         const checkbox = div.querySelector('input[type="checkbox"]');
@@ -414,7 +414,6 @@
                     }
                 });
                 
-                // Update UI when checkbox changes
                 const checkbox = div.querySelector('input[type="checkbox"]');
                 checkbox.addEventListener('change', () => {
                     updateCheckboxUI(checkbox);
@@ -471,23 +470,19 @@
             const submitBtn = document.getElementById('submitBtn');
             const originalBtnContent = submitBtn.innerHTML;
             
-            // Validation
             const jenis = document.getElementById('jenis').value;
             if (!jenis) {
                 showNotification('error', 'Validasi', 'Pilih jenis presensi');
                 return;
             }
             
-            // Collect siswa hadir
             const hadirCheckboxes = document.querySelectorAll('input[name="siswaHadir"]:checked');
             const siswaHadir = Array.from(hadirCheckboxes).map(cb => cb.value);
             
-            // Collect semua siswa untuk hitung yang tidak hadir
             const semuaSiswaItems = document.querySelectorAll('.siswa-item input[name="siswaHadir"]');
             const semuaSiswa = Array.from(semuaSiswaItems).map(cb => cb.value);
             const siswaTidakHadir = semuaSiswa.filter(s => !siswaHadir.includes(s));
             
-            // Get siswa manual
             const siswaManual = document.getElementById('siswaManual').value;
             
             const formData = {
@@ -502,7 +497,6 @@
                 siswaManual: siswaManual
             };
             
-            // Show loading
             submitBtn.disabled = true;
             submitBtn.innerHTML = `
                 <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -513,7 +507,7 @@
             `;
             
             try {
-                const response = await fetch(https://script.google.com/macros/s/AKfycbydQLyp6LkW3Nvu1kyQ9v_n0FZfi-dAAzsoCCXEzUXZ18sUcYoljAmXxaPR5YTAK41QfQ/exec, {
+                const response = await fetch(APPS_SCRIPT_URL, {
                     method: 'POST',
                     body: JSON.stringify(formData)
                 });
@@ -522,7 +516,7 @@
                 
                 if (result.status === 'success') {
                     showNotification('success', 'Berhasil!', 
-                        `Presensi tersimpan!<br>Hadir: ${result.totalHadir} | Tidak Hadir: ${result.totalTidakHadir}`);
+                        `Presensi tersimpan!<br>Hadir: ${result.totalHadir || siswaHadir.length} | Tidak Hadir: ${result.totalTidakHadir || siswaTidakHadir.length}`);
                     handleReset();
                 } else {
                     showNotification('error', 'Gagal', result.message);
@@ -566,10 +560,8 @@
             
             if (type === 'success') {
                 icon.innerHTML = '<div class="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-5 h-5 text-emerald-600"></i></div>';
-                notif.querySelector('.border-l-4').classList.add('border-emerald-500');
             } else {
                 icon.innerHTML = '<div class="w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center flex-shrink-0"><i data-lucide="x" class="w-5 h-5 text-rose-600"></i></div>';
-                notif.querySelector('.border-l-4').classList.add('border-rose-500');
             }
             
             notifTitle.textContent = title;
