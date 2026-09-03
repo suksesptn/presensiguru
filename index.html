@@ -15,6 +15,7 @@
     <style>
         body { font-family: 'Poppins', sans-serif; }
         select:disabled { opacity: 0.5; cursor: not-allowed; }
+        /* Warna checkbox tetap hijau agar senada, tapi logikanya dibalik */
         input[type="checkbox"] { accent-color: #059669; }
     </style>
 </head>
@@ -43,7 +44,6 @@
                     <h2 class="text-lg font-semibold text-slate-900">Informasi Presensi</h2>
                 </div>
 
-                <!-- Banner status data -->
                 <div id="loadBanner" class="mb-5 flex items-center gap-3 text-sm text-slate-600 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
                     <svg id="loadSpinner" class="animate-spin h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                     <span id="loadBannerText">Memuat data guru & siswa...</span>
@@ -105,6 +105,15 @@
                     <div class="text-sm text-slate-500"><span id="totalSiswa">0</span> siswa</div>
                 </div>
 
+                <!-- PERUBAHAN: Petunjuk diubah menjadi "Ceklis yang TIDAK HADIR" -->
+                <div class="mb-4 px-4 py-3 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-3">
+                    <i data-lucide="alert-circle" class="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-rose-700 font-medium">
+                        Centang kotak di samping nama siswa yang <strong>TIDAK HADIR</strong> (Alpa/Izin/Sakit). 
+                        <br><span class="font-normal text-rose-600">Jika tidak ada yang dicentang, berarti semua siswa HADIR.</span>
+                    </p
+                </div>
+
                 <div class="mb-4 relative">
                     <input type="text" id="searchSiswa" placeholder="Cari nama siswa..." class="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-primary focus:ring-2 focus:ring-emerald-200 outline-none">
                 </div>
@@ -114,7 +123,10 @@
                 </div>
 
                 <div class="mt-5 pt-5 border-t border-slate-100">
-                    <label class="block text-sm font-semibold text-slate-700 mb-2">Tambah Siswa Manual (pisahkan dengan koma)</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                        <i data-lucide="user-plus" class="w-4 h-4 inline mr-1"></i>
+                        Tambah Siswa Manual (pisahkan dengan koma)
+                    </label>
                     <textarea id="siswaManual" rows="2" placeholder="Contoh: Ahmad Fauzi, Budi Santoso" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-emerald-200 outline-none bg-slate-50 resize-none text-sm"></textarea>
                     <p class="text-xs text-slate-500 mt-1">* Siswa manual otomatis dianggap hadir</p>
                 </div>
@@ -153,7 +165,6 @@
     </div>
 
     <script>
-        // ============ KONFIGURASI ============
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCp5KbBXiuKsjZAROVqxgMtqNAb8SSWc-6XvmsEranPS8cl2x1_-cCJh6FdPfP2aUhlw/exec";
         const INTENSIVE = ['TKA', 'SNBT', 'IUP', 'Ujian Mandiri'];
 
@@ -162,10 +173,8 @@
         let currentMode = 'dropdown';
         let pendingJenis = null;
 
-        // Ikon aman: tidak akan menghentikan script walau CDN gagal
         function icons() { try { if (window.lucide) lucide.createIcons(); } catch (e) {} }
 
-        // ============ MUAT DATA OTOMATIS (dengan retry) ============
         async function loadAllData(attempt) {
             const banner = document.getElementById('loadBanner');
             const text = document.getElementById('loadBannerText');
@@ -180,7 +189,6 @@
                 dataReady = true;
                 banner.classList.add('hidden');
 
-                // Jika guru sudah memilih jenis sebelum data siap, terapkan sekarang
                 if (pendingJenis) { applyJenis(pendingJenis); pendingJenis = null; }
             } catch (e) {
                 if (attempt < 2) {
@@ -198,7 +206,6 @@
             loadAllData(0);
         }
 
-        // ============ LOGIKA FORM ============
         function applyJenis(jenis) {
             const d = allData[jenis];
             if (d && (d.mapel.length || d.kelas.length || d.guru.length)) {
@@ -221,7 +228,6 @@
         function handleJenisChange() {
             const jenis = this.value;
             if (!dataReady && INTENSIVE.indexOf(jenis) !== -1) {
-                // Data belum siap → simpan pilihan, terapkan otomatis saat data siap
                 pendingJenis = jenis;
                 showNotification('info', 'Info', 'Data masih dimuat, pilihan akan terisi otomatis sebentar lagi.');
                 return;
@@ -263,7 +269,6 @@
             });
         }
 
-        // ============ DAFTAR SISWA (checkbox asli, dijamin bisa diklik) ============
         function renderSiswaList(siswaList) {
             const container = document.getElementById('siswaList');
             container.innerHTML = '';
@@ -277,20 +282,24 @@
 
             siswaList.forEach(function(siswa) {
                 const label = document.createElement('label');
-                label.className = 'siswa-item flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200 hover:border-primary transition-colors cursor-pointer';
+                label.className = 'siswa-item flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200 hover:border-rose-300 transition-colors cursor-pointer';
+                // PERUBAHAN: name diubah menjadi siswaTidakHadir agar logika JS lebih jelas
                 label.innerHTML =
-                    '<input type="checkbox" name="siswaHadir" value="' + siswa + '" onchange="updateStatistik()" class="w-5 h-5 rounded cursor-pointer flex-shrink-0">' +
+                    '<input type="checkbox" name="siswaTidakHadir" value="' + siswa + '" onchange="updateStatistik()" class="w-5 h-5 rounded cursor-pointer flex-shrink-0">' +
                     '<span class="font-medium text-slate-700">' + siswa + '</span>';
                 container.appendChild(label);
             });
             updateStatistik();
         }
 
+        // PERUBAHAN: Logika statistik dibalik
         function updateStatistik() {
-            const hadir = document.querySelectorAll('input[name="siswaHadir"]:checked').length;
+            const tidakHadir = document.querySelectorAll('input[name="siswaTidakHadir"]:checked').length;
             const total = document.querySelectorAll('.siswa-item').length;
+            const hadir = total - tidakHadir;
+            
             document.getElementById('statHadir').textContent = hadir;
-            document.getElementById('statTidakHadir').textContent = total - hadir;
+            document.getElementById('statTidakHadir').textContent = tidakHadir;
         }
 
         function handleSearchSiswa() {
@@ -300,7 +309,6 @@
             });
         }
 
-        // ============ SUBMIT ============
         function getFieldValue(field) {
             if (currentMode === 'dropdown') return document.getElementById(field).value || '';
             return document.getElementById(field + '_manual').value || '';
@@ -314,9 +322,10 @@
             const guru = getFieldValue('guru');
             if (!guru) { showNotification('error', 'Validasi', 'Nama guru wajib diisi'); return; }
 
-            const siswaHadir = Array.from(document.querySelectorAll('input[name="siswaHadir"]:checked')).map(cb => cb.value);
-            const semuaSiswa = Array.from(document.querySelectorAll('.siswa-item input[name="siswaHadir"]')).map(cb => cb.value);
-            const siswaTidakHadir = semuaSiswa.filter(s => siswaHadir.indexOf(s) === -1);
+            // PERUBAHAN: Mapping array dibalik sesuai logika checkbox baru
+            const siswaTidakHadir = Array.from(document.querySelectorAll('input[name="siswaTidakHadir"]:checked')).map(cb => cb.value);
+            const semuaSiswa = Array.from(document.querySelectorAll('.siswa-item input[name="siswaTidakHadir"]')).map(cb => cb.value);
+            const siswaHadir = semuaSiswa.filter(s => siswaTidakHadir.indexOf(s) === -1);
 
             const formData = {
                 jenis: document.getElementById('jenis').value,
@@ -325,8 +334,8 @@
                 guru: guru,
                 kelas: getFieldValue('kelas'),
                 jp: document.getElementById('jp').value,
-                siswaHadir: siswaHadir,
-                siswaTidakHadir: siswaTidakHadir,
+                siswaHadir: siswaHadir,       // Tetap kirim dengan key ini agar backend tidak perlu diubah
+                siswaTidakHadir: siswaTidakHadir, // Tetap kirim dengan key ini
                 siswaManual: document.getElementById('siswaManual').value
             };
 
@@ -359,7 +368,6 @@
             renderSiswaList([]);
         }
 
-        // ============ NOTIFIKASI ============
         function showNotification(type, title, message) {
             const notif = document.getElementById('notification');
             notif.classList.remove('hidden');
@@ -374,7 +382,6 @@
             document.getElementById('notification').classList.add('hidden');
         }
 
-        // ============ INISIALISASI (aman, pakai try-catch per bagian) ============
         function init() {
             icons();
             try { document.getElementById('tanggal').valueAsDate = new Date(); } catch (e) {}
@@ -386,7 +393,6 @@
                 document.getElementById('presensiForm').addEventListener('submit', handleSubmit);
                 document.getElementById('resetBtn').addEventListener('click', handleReset);
             } catch (e) { console.error(e); }
-            // LANGSUNG muat data saat halaman terbuka
             loadAllData(0);
         }
 
