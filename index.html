@@ -281,11 +281,21 @@
         }
 
         function handleKelasChange() {
-            if (currentMode === 'pengawas' || currentMode === 'manual') return;
-
+            // Untuk mode manual, tidak ada daftar siswa
+            if (currentMode === 'manual') return;
+        
             const jenis = document.getElementById('jenis').value;
-            const d = allData[jenis] || { siswa: [] };
-            const siswas = d.siswa.filter(s => s.kelas === this.value).map(s => s.nama).sort();
+            let d;
+            
+            // Untuk pengawas tryout, ambil data dari 'Umum'
+            if (currentMode === 'pengawas') {
+                d = allData['Umum'] || { siswa: [] };
+            } else {
+                d = allData[jenis] || { siswa: [] };
+            }
+            
+            const kelasSelected = this.value;
+            const siswas = d.siswa.filter(s => s.kelas === kelasSelected).map(s => s.nama).sort();
             renderSiswaList(siswas);
         }
 
