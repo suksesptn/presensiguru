@@ -155,7 +155,8 @@
                 <button type="button" id="resetBtn" class="flex-1 px-6 py-4 border-2 border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-all">
                     <i data-lucide="rotate-ccw" class="w-5 h-5 inline mr-2"></i>Reset Form
                 </button>
-                <button type="submit" id="submitBtn" class="flex-[2] bg-primary hover:bg-primaryDark text-white font-semibold py-4 px-6 rounded-xl shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                <button type="submit" id="submitBtn" class="flex-[2] bg-primary hover:bg-primaryDark text-white font-semibold py-4 px-6 rounded-xl shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i data-lucide="save" class="w-5 h-5"></i>
                     <span>Simpan Presensi</span>
                 </button>
             </div>
@@ -164,7 +165,8 @@
         <p class="text-center text-xs text-slate-400 mt-8">Tim Sukses PTN Al Bayan</p>
     </main>
 
-    <div id="notification" class="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-96 hidden z-50">
+    <!-- Notifikasi Pojok Kanan Bawah -->
+    <div id="notification" class="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-96 hidden z-[60]">
         <div class="bg-white rounded-xl shadow-2xl border-l-4 p-4 flex items-start gap-3">
             <div id="notifIcon"></div>
             <div class="flex-1">
@@ -175,9 +177,46 @@
         </div>
     </div>
 
+    <!-- FULL SCREEN LOADING & SUCCESS OVERLAY -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[100] hidden flex flex-col items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl flex flex-col items-center gap-4 max-w-sm w-full p-8 text-center transform transition-all">
+            
+            <!-- Loading State -->
+            <div id="loadingState" class="flex flex-col items-center w-full">
+                <svg class="animate-spin h-12 w-12 text-primary mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <h3 class="text-xl font-bold text-slate-900">Menyimpan Data...</h3>
+                <p class="text-sm text-slate-500 mt-2">Mohon tunggu, jangan tutup atau refresh halaman ini.</p>
+            </div>
+            
+            <!-- Success State -->
+            <div id="successState" class="hidden flex-col items-center w-full">
+                <div class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-slate-900">Berhasil Disimpan!</h3>
+                <p class="text-sm text-slate-500 mt-2">Data presensi telah tercatat di sistem.</p>
+                <div class="mt-4 bg-slate-50 rounded-xl p-4 w-full text-sm border border-slate-100">
+                    <div class="flex justify-between items-center mb-2 pb-2 border-b border-slate-200">
+                        <span class="text-slate-600">Siswa Hadir</span> 
+                        <span class="font-bold text-emerald-600 text-lg" id="successHadir">0</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-600">Tidak Hadir</span> 
+                        <span class="font-bold text-rose-600 text-lg" id="successTidakHadir">0</span>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
     <script>
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCp5KbBXiuKsjZAROVqxgMtqNAb8SSWc-6XvmsEranPS8cl2x1_-cCJh6FdPfP2aUhlw/exec";
-        // Tambahkan 'Pengawas Tryout' agar dia menunggu data dimuat
         const JENIS_WITH_DATA = ['TKA', 'SNBT', 'IUP', 'Ujian Mandiri', 'Pengawas Tryout'];
 
         let allData = {};
@@ -218,24 +257,19 @@
         }
 
         function applyJenis(jenis) {
-            // Untuk Pengawas Tryout, ambil data dari 'Umum'
             const d = allData[jenis] || allData['Umum']; 
             
             if (jenis === 'Pengawas Tryout') {
                 currentMode = 'pengawas';
                 setMode('pengawas');
-                
-                // Ubah label dan isi dropdown khusus Pengawas
                 document.getElementById('labelMapel').innerHTML = 'Jenis Tryout <span class="text-rose-500">*</span>';
                 populateSelect('mapel', ['Tryout UTBK', 'Tryout TKA'], 'Pilih Jenis Tryout...');
                 document.getElementById('mapel').disabled = false;
 
-                // Load Guru dari data Umum
                 const gurus = (d.guru || []).map(g => g.nama).sort();
                 populateSelect('guru', gurus, 'Pilih Nama Guru...');
                 document.getElementById('guru').disabled = false;
 
-                // Load Kelas dari data Umum
                 populateSelect('kelas', d.kelas || [], 'Pilih Anggota Kelas / Ruang...');
                 document.getElementById('kelas').disabled = false;
 
@@ -270,9 +304,7 @@
         }
 
         function handleMapelChange() {
-            // Hanya jalankan logika filter guru jika bukan mode pengawas
             if (currentMode === 'pengawas') return;
-
             const jenis = document.getElementById('jenis').value;
             const d = allData[jenis] || { guru: [] };
             const gurus = d.guru.filter(g => g.mapel === this.value).map(g => g.nama).sort();
@@ -281,18 +313,9 @@
         }
 
         function handleKelasChange() {
-            // Untuk mode manual, tidak ada daftar siswa
             if (currentMode === 'manual') return;
-        
             const jenis = document.getElementById('jenis').value;
-            let d;
-            
-            // Untuk pengawas tryout, ambil data dari 'Umum'
-            if (currentMode === 'pengawas') {
-                d = allData['Umum'] || { siswa: [] };
-            } else {
-                d = allData[jenis] || { siswa: [] };
-            }
+            let d = (currentMode === 'pengawas') ? (allData['Umum'] || { siswa: [] }) : (allData[jenis] || { siswa: [] });
             
             const kelasSelected = this.value;
             const siswas = d.siswa.filter(s => s.kelas === kelasSelected).map(s => s.nama).sort();
@@ -368,11 +391,11 @@
 
         async function handleSubmit(e) {
             e.preventDefault();
-            const submitBtn = document.getElementById('submitBtn');
-            const original = submitBtn.innerHTML;
-
+            
+            // Validasi dasar
             const guru = getFieldValue('guru');
             if (!guru) { showNotification('error', 'Validasi', 'Nama guru wajib diisi'); return; }
+            if (!document.getElementById('tanggal').value) { showNotification('error', 'Validasi', 'Tanggal wajib diisi'); return; }
 
             const siswaTidakHadir = Array.from(document.querySelectorAll('input[name="siswaTidakHadir"]:checked')).map(cb => cb.value);
             const semuaSiswa = Array.from(document.querySelectorAll('.siswa-item input[name="siswaTidakHadir"]')).map(cb => cb.value);
@@ -381,7 +404,7 @@
             const formData = {
                 jenis: document.getElementById('jenis').value,
                 tanggal: document.getElementById('tanggal').value,
-                mapel: getFieldValue('mapel'), // Akan berisi "Tryout UTBK" atau "Tryout TKA"
+                mapel: getFieldValue('mapel'),
                 guru: guru,
                 kelas: getFieldValue('kelas'),
                 jp: document.getElementById('jp').value,
@@ -390,23 +413,54 @@
                 siswaManual: document.getElementById('siswaManual').value
             };
 
+            // 1. Tampilkan overlay loading & blokir semua interaksi di layar
+            const overlay = document.getElementById('loadingOverlay');
+            const loadingState = document.getElementById('loadingState');
+            const successState = document.getElementById('successState');
+            const submitBtn = document.getElementById('submitBtn');
+
+            loadingState.classList.remove('hidden');
+            loadingState.classList.add('flex');
+            successState.classList.add('hidden');
+            successState.classList.remove('flex');
+            overlay.classList.remove('hidden');
+            
+            // Disable tombol agar tidak bisa diklik lagi secara fisik
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span>Menyimpan...</span>';
 
             try {
-                const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(formData) });
+                // 2. Kirim data ke Apps Script
+                const res = await fetch(APPS_SCRIPT_URL, { 
+                    method: 'POST', 
+                    body: JSON.stringify(formData) 
+                });
+                
                 const result = await res.json();
+                
                 if (result.status === 'success') {
-                    showNotification('success', 'Berhasil!', 'Presensi tersimpan!<br>Hadir: ' + result.totalHadir + ' | Tidak Hadir: ' + result.totalTidakHadir);
-                    handleReset();
+                    // 3. Tampilkan state sukses di overlay
+                    loadingState.classList.add('hidden');
+                    loadingState.classList.remove('flex');
+                    successState.classList.remove('hidden');
+                    successState.classList.add('flex');
+                    
+                    document.getElementById('successHadir').textContent = result.totalHadir;
+                    document.getElementById('successTidakHadir').textContent = result.totalTidakHadir;
+
+                    // 4. Tunggu 2.5 detik agar user melihat pesan sukses, lalu reset form dan tutup overlay
+                    setTimeout(() => {
+                        overlay.classList.add('hidden');
+                        handleReset();
+                        submitBtn.disabled = false;
+                    }, 2500);
                 } else {
-                    showNotification('error', 'Gagal', result.message);
+                    throw new Error(result.message || 'Gagal menyimpan data');
                 }
             } catch (err) {
-                showNotification('error', 'Error', 'Terjadi kesalahan saat menyimpan');
-            } finally {
+                // Jika error, tutup overlay dan kembalikan tombol
+                overlay.classList.add('hidden');
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = original;
+                showNotification('error', 'Gagal', 'Terjadi kesalahan: ' + err.message);
             }
         }
 
