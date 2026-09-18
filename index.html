@@ -176,8 +176,7 @@
     </div>
 
     <script>
-        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCp5KbBXiuKsjZAROVqxgMtqNAb8SSWc-6XvmsEranPS8cl2x1_-cCJh6FdPfP2aUhlw/exec";
-        // Tambahkan 'Pengawas Tryout' agar dia menunggu data dimuat
+        const APPS_SCRIPT_URL = "";
         const JENIS_WITH_DATA = ['TKA', 'SNBT', 'IUP', 'Ujian Mandiri', 'Pengawas Tryout'];
 
         let allData = {};
@@ -218,24 +217,20 @@
         }
 
         function applyJenis(jenis) {
-            // Untuk Pengawas Tryout, ambil data dari 'Umum'
             const d = allData[jenis] || allData['Umum']; 
             
             if (jenis === 'Pengawas Tryout') {
                 currentMode = 'pengawas';
                 setMode('pengawas');
                 
-                // Ubah label dan isi dropdown khusus Pengawas
                 document.getElementById('labelMapel').innerHTML = 'Jenis Tryout <span class="text-rose-500">*</span>';
                 populateSelect('mapel', ['Tryout UTBK', 'Tryout TKA'], 'Pilih Jenis Tryout...');
                 document.getElementById('mapel').disabled = false;
 
-                // Load Guru dari data Umum
                 const gurus = (d.guru || []).map(g => g.nama).sort();
                 populateSelect('guru', gurus, 'Pilih Nama Guru...');
                 document.getElementById('guru').disabled = false;
 
-                // Load Kelas dari data Umum
                 populateSelect('kelas', d.kelas || [], 'Pilih Anggota Kelas / Ruang...');
                 document.getElementById('kelas').disabled = false;
 
@@ -270,7 +265,6 @@
         }
 
         function handleMapelChange() {
-            // Hanya jalankan logika filter guru jika bukan mode pengawas
             if (currentMode === 'pengawas') return;
 
             const jenis = document.getElementById('jenis').value;
@@ -281,13 +275,11 @@
         }
 
         function handleKelasChange() {
-            // Untuk mode manual, tidak ada daftar siswa
             if (currentMode === 'manual') return;
         
             const jenis = document.getElementById('jenis').value;
             let d;
             
-            // Untuk pengawas tryout, ambil data dari 'Umum'
             if (currentMode === 'pengawas') {
                 d = allData['Umum'] || { siswa: [] };
             } else {
@@ -366,22 +358,41 @@
             return document.getElementById(field + '_manual').value || '';
         }
 
+        // ============================================================
+        // HANDLE SUBMIT - DENGAN ANTI KLIK DOBEL & LOADING JELAS
+        // ============================================================
         async function handleSubmit(e) {
             e.preventDefault();
             const submitBtn = document.getElementById('submitBtn');
-            const original = submitBtn.innerHTML;
+            const originalHTML = submitBtn.innerHTML;
 
+            // 1. VALIDASI CEPAT
+            const jenis = document.getElementById('jenis').value;
             const guru = getFieldValue('guru');
+            
+            if (!jenis) { showNotification('error', 'Validasi', 'Jenis presensi wajib dipilih'); return; }
             if (!guru) { showNotification('error', 'Validasi', 'Nama guru wajib diisi'); return; }
 
+            // 2. KUNCI TOMBOL & TAMPILKAN LOADING (Mencegah klik dobel)
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Menyimpan data...</span>
+            `;
+            submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
+
+            // 3. KUMPULKAN DATA
             const siswaTidakHadir = Array.from(document.querySelectorAll('input[name="siswaTidakHadir"]:checked')).map(cb => cb.value);
             const semuaSiswa = Array.from(document.querySelectorAll('.siswa-item input[name="siswaTidakHadir"]')).map(cb => cb.value);
             const siswaHadir = semuaSiswa.filter(s => siswaTidakHadir.indexOf(s) === -1);
 
             const formData = {
-                jenis: document.getElementById('jenis').value,
+                jenis: jenis,
                 tanggal: document.getElementById('tanggal').value,
-                mapel: getFieldValue('mapel'), // Akan berisi "Tryout UTBK" atau "Tryout TKA"
+                mapel: getFieldValue('mapel'),
                 guru: guru,
                 kelas: getFieldValue('kelas'),
                 jp: document.getElementById('jp').value,
@@ -390,23 +401,29 @@
                 siswaManual: document.getElementById('siswaManual').value
             };
 
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span>Menyimpan...</span>';
-
             try {
-                const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(formData) });
+                // 4. KIRIM DATA
+                const res = await fetch(APPS_SCRIPT_URL, { 
+                    method: 'POST', 
+                    body: JSON.stringify(formData) 
+                });
+                
                 const result = await res.json();
+                
                 if (result.status === 'success') {
-                    showNotification('success', 'Berhasil!', 'Presensi tersimpan!<br>Hadir: ' + result.totalHadir + ' | Tidak Hadir: ' + result.totalTidakHadir);
+                    showNotification('success', 'Berhasil!', `Presensi tersimpan!<br>Hadir: ${result.totalHadir} | Tidak Hadir: ${result.totalTidakHadir}`);
                     handleReset();
                 } else {
-                    showNotification('error', 'Gagal', result.message);
+                    showNotification('error', 'Gagal', result.message || 'Terjadi kesalahan pada server');
                 }
             } catch (err) {
-                showNotification('error', 'Error', 'Terjadi kesalahan saat menyimpan');
+                console.error(err);
+                showNotification('error', 'Error Jaringan', 'Gagal terhubung ke server. Cek koneksi internet Anda.');
             } finally {
+                // 5. KEMBALIKAN TOMBOL KE KONDISI SEMULA (Wajib ada di finally)
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = original;
+                submitBtn.innerHTML = originalHTML;
+                submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
             }
         }
 
