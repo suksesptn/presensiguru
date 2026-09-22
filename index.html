@@ -218,46 +218,46 @@
         }
 
         function applyJenis(jenis) {
-            // Untuk Pengawas Tryout, ambil data dari 'Umum'
-            const d = allData[jenis] || allData['Umum']; 
-            
-            if (jenis === 'Pengawas Tryout') {
-                currentMode = 'pengawas';
-                setMode('pengawas');
-                
-                // Ubah label dan isi dropdown khusus Pengawas
-                document.getElementById('labelMapel').innerHTML = 'Jenis Tryout <span class="text-rose-500">*</span>';
-                populateSelect('mapel', ['Tryout UTBK', 'Tryout TKA'], 'Pilih Jenis Tryout...');
-                document.getElementById('mapel').disabled = false;
+    // Untuk Pengawas Tryout, ambil data dari 'Tryout' (bukan 'Umum')
+    const d = allData[jenis] || allData['Tryout']; 
+    
+    if (jenis === 'Pengawas Tryout') {
+        currentMode = 'pengawas';
+        setMode('pengawas');
+        
+        // Ubah label dan isi dropdown khusus Pengawas
+        document.getElementById('labelMapel').innerHTML = 'Jenis Tryout <span class="text-rose-500">*</span>';
+        populateSelect('mapel', ['Tryout UTBK', 'Tryout TKA'], 'Pilih Jenis Tryout...');
+        document.getElementById('mapel').disabled = false;
 
-                // Load Guru dari data Umum
-                const gurus = (d.guru || []).map(g => g.nama).sort();
-                populateSelect('guru', gurus, 'Pilih Nama Guru...');
-                document.getElementById('guru').disabled = false;
+        // Load Guru dari data Tryout
+        const gurus = (d.guru || []).map(g => g.nama).sort();
+        populateSelect('guru', gurus, 'Pilih Nama Guru...');
+        document.getElementById('guru').disabled = false;
 
-                // Load Kelas dari data Umum
-                populateSelect('kelas', d.kelas || [], 'Pilih Anggota Kelas / Ruang...');
-                document.getElementById('kelas').disabled = false;
+        // Load Kelas dari data Tryout
+        populateSelect('kelas', d.kelas || [], 'Pilih Anggota Kelas / Ruang...');
+        document.getElementById('kelas').disabled = false;
 
-            } else if (d && (d.mapel.length || d.kelas.length || d.guru.length)) {
-                currentMode = 'dropdown';
-                setMode('dropdown');
-                document.getElementById('labelMapel').innerHTML = 'Mata Pelajaran';
-                populateSelect('mapel', d.mapel, 'Pilih Mapel...');
-                populateSelect('kelas', d.kelas, 'Pilih Kelas...');
-                
-                const guruSel = document.getElementById('guru');
-                guruSel.innerHTML = '<option value="" disabled selected>Pilih mapel dulu</option>';
-                guruSel.disabled = true;
-                document.getElementById('mapel').disabled = false;
-                document.getElementById('kelas').disabled = false;
-            } else {
-                currentMode = 'manual';
-                setMode('manual');
-                document.getElementById('labelMapel').innerHTML = 'Mata Pelajaran / Kegiatan';
-            }
-            renderSiswaList([]);
-        }
+    } else if (d && (d.mapel.length || d.kelas.length || d.guru.length)) {
+        currentMode = 'dropdown';
+        setMode('dropdown');
+        document.getElementById('labelMapel').innerHTML = 'Mata Pelajaran';
+        populateSelect('mapel', d.mapel, 'Pilih Mapel...');
+        populateSelect('kelas', d.kelas, 'Pilih Kelas...');
+        
+        const guruSel = document.getElementById('guru');
+        guruSel.innerHTML = '<option value="" disabled selected>Pilih mapel dulu</option>';
+        guruSel.disabled = true;
+        document.getElementById('mapel').disabled = false;
+        document.getElementById('kelas').disabled = false;
+    } else {
+        currentMode = 'manual';
+        setMode('manual');
+        document.getElementById('labelMapel').innerHTML = 'Mata Pelajaran / Kegiatan';
+    }
+    renderSiswaList([]);
+}
 
         function handleJenisChange() {
             const jenis = this.value;
@@ -280,24 +280,24 @@
             document.getElementById('guru').disabled = false;
         }
 
-        function handleKelasChange() {
-            // Untuk mode manual, tidak ada daftar siswa
-            if (currentMode === 'manual') return;
-        
-            const jenis = document.getElementById('jenis').value;
-            let d;
-            
-            // Untuk pengawas tryout, ambil data dari 'Umum'
-            if (currentMode === 'pengawas') {
-                d = allData['Umum'] || { siswa: [] };
-            } else {
-                d = allData[jenis] || { siswa: [] };
-            }
-            
-            const kelasSelected = this.value;
-            const siswas = d.siswa.filter(s => s.kelas === kelasSelected).map(s => s.nama).sort();
-            renderSiswaList(siswas);
-        }
+       function handleKelasChange() {
+    // Untuk mode manual, tidak ada daftar siswa
+    if (currentMode === 'manual') return;
+
+    const jenis = document.getElementById('jenis').value;
+    let d;
+    
+    // Untuk pengawas tryout, ambil data dari 'Tryout' (bukan 'Umum')
+    if (currentMode === 'pengawas') {
+        d = allData['Tryout'] || { siswa: [] };
+    } else {
+        d = allData[jenis] || { siswa: [] };
+    }
+    
+    const kelasSelected = this.value;
+    const siswas = d.siswa.filter(s => s.kelas === kelasSelected).map(s => s.nama).sort();
+    renderSiswaList(siswas);
+}
 
         function setMode(mode) {
             ['mapel', 'guru', 'kelas'].forEach(function(f) {
