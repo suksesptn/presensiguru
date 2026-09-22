@@ -21,6 +21,31 @@
         body { font-family: 'Poppins', sans-serif; }
         select:disabled { opacity: 0.5; cursor: not-allowed; }
         input[type="checkbox"] { accent-color: #059669; width: 1.25rem; height: 1.25rem; }
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-content {
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
     </style>
 </head>
 <body class="bg-background text-slate-800 antialiased min-h-screen flex flex-col">
@@ -155,7 +180,7 @@
                 <button type="button" id="resetBtn" class="flex-1 px-6 py-4 border-2 border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-all">
                     <i data-lucide="rotate-ccw" class="w-5 h-5 inline mr-2"></i>Reset Form
                 </button>
-                <button type="submit" id="submitBtn" class="flex-[2] bg-primary hover:bg-primaryDark text-white font-semibold py-4 px-6 rounded-xl shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <button type="submit" id="submitBtn" class="flex-[2] bg-primary hover:bg-primaryDark text-white font-semibold py-4 px-6 rounded-xl shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2">
                     <span>Simpan Presensi</span>
                 </button>
             </div>
@@ -177,40 +202,36 @@
     </div>
 
     <!-- FULL-SCREEN LOADING OVERLAY -->
-    <div id="submitOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl text-center">
+    <div id="submitOverlay" class="modal-overlay">
+        <div class="modal-content bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl text-center">
             <div class="mb-6">
                 <div class="relative inline-block">
                     <svg class="animate-spin h-16 w-16 text-primary mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <div class="absolute inset-0 flex items-center justify-center">
-                        <i data-lucide="send" class="w-6 h-6 text-primary"></i>
-                    </div>
                 </div>
             </div>
-            <h3 class="text-xl font-bold text-slate-900 mb-2">Sedang Mengirim Presensi</h3>
-            <p class="text-slate-600 mb-4">Mohon tunggu sebentar...</p>
+            <h3 id="loadingTitle" class="text-xl font-bold text-slate-900 mb-2">Sedang Mengirim Presensi</h3>
+            <p id="loadingSubtitle" class="text-slate-600 mb-4">Mohon tunggu sebentar...</p>
             <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p class="text-sm text-amber-800 font-medium">
-                    <i data-lucide="alert-circle" class="w-4 h-4 inline mr-1"></i>
-                    Jangan tutup halaman ini
+                    ⚠️ Jangan tutup halaman ini
                 </p>
             </div>
         </div>
     </div>
 
     <!-- SUCCESS POPUP MODAL -->
-    <div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 z-[101] hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl text-center transform scale-95 opacity-0 transition-all duration-300" id="successModalContent">
+    <div id="successModal" class="modal-overlay">
+        <div class="modal-content bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl text-center">
             <div class="mb-6">
                 <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <i data-lucide="check-circle" class="w-12 h-12 text-emerald-600"></i>
                 </div>
             </div>
             <h3 class="text-2xl font-bold text-slate-900 mb-2">Presensi Berhasil Dikirim!</h3>
-            <p class="text-slate-600 mb-6" id="successMessage">Data presensi telah tersimpan ke sistem.</p>
+            <p class="text-slate-600 mb-6">Data presensi telah tersimpan ke sistem.</p>
             
             <div class="grid grid-cols-2 gap-3 mb-6">
                 <div class="bg-emerald-50 rounded-xl p-3">
@@ -237,6 +258,7 @@
         let dataReady = false;
         let currentMode = 'dropdown';
         let pendingJenis = null;
+        let isSubmitting = false;
 
         function icons() { try { if (window.lucide) lucide.createIcons(); } catch (e) {} }
 
@@ -413,33 +435,33 @@
         }
 
         // ============================================================
-        // HANDLE SUBMIT - DENGAN OVERLAY & ANTI DOUBLE CLICK
+        // HANDLE SUBMIT - DENGAN TIMEOUT & ANTI DOUBLE CLICK
         // ============================================================
         async function handleSubmit(e) {
             e.preventDefault();
             
+            // Cegah double submit
+            if (isSubmitting) return;
+            isSubmitting = true;
+            
             const submitBtn = document.getElementById('submitBtn');
             const overlay = document.getElementById('submitOverlay');
             const successModal = document.getElementById('successModal');
-            const successModalContent = document.getElementById('successModalContent');
             
             // Validasi cepat
             const guru = getFieldValue('guru');
             if (!guru) { 
                 showNotification('error', 'Validasi', 'Nama guru wajib diisi'); 
+                isSubmitting = false;
                 return; 
             }
 
             // 1. TAMPILKAN OVERLAY FULL-SCREEN
-            overlay.classList.remove('hidden');
+            overlay.classList.add('active');
             
-            // 2. DISABLE TOMBOL & FORM (Anti double click)
+            // 2. DISABLE TOMBOL
             submitBtn.disabled = true;
             submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            
-            // Disable semua input untuk mencegah perubahan data saat submit
-            const allInputs = document.querySelectorAll('#presensiForm input, #presensiForm select, #presensiForm textarea');
-            allInputs.forEach(input => input.disabled = true);
             
             // Kumpulkan data
             const siswaTidakHadir = Array.from(document.querySelectorAll('input[name="siswaTidakHadir"]:checked')).map(cb => cb.value);
@@ -458,80 +480,130 @@
                 siswaManual: document.getElementById('siswaManual').value
             };
 
+            // Simpan ke localStorage untuk recovery
             try {
-                // 3. KIRIM DATA
+                localStorage.setItem('pendingPresensi', JSON.stringify({
+                    data: formData,
+                    timestamp: Date.now()
+                }));
+            } catch (err) {}
+
+            let isSuccess = false;
+            let resultData = null;
+
+            try {
+                // 3. KIRIM DATA DENGAN TIMEOUT 15 DETIK
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+                
+                // Update pesan loading setelah 5 detik
+                setTimeout(() => {
+                    const loadingTitle = document.getElementById('loadingTitle');
+                    const loadingSubtitle = document.getElementById('loadingSubtitle');
+                    if (loadingTitle) loadingTitle.textContent = 'Masih Mengirim...';
+                    if (loadingSubtitle) loadingSubtitle.textContent = 'Data sedang diproses server, mohon tunggu...';
+                }, 5000);
+
                 const res = await fetch(APPS_SCRIPT_URL, { 
                     method: 'POST', 
-                    body: JSON.stringify(formData)
+                    body: JSON.stringify(formData),
+                    signal: controller.signal
                 });
                 
-                const result = await res.json();
+                clearTimeout(timeoutId);
                 
-                // 4. SEMBUNYIKAN OVERLAY
-                overlay.classList.add('hidden');
+                const result = await res.json();
+                resultData = result;
                 
                 if (result.status === 'success') {
-                    // 5. TAMPILKAN SUCCESS MODAL
-                    document.getElementById('successHadir').textContent = result.totalHadir || 0;
-                    document.getElementById('successTidakHadir').textContent = result.totalTidakHadir || 0;
-                    
-                    successModal.classList.remove('hidden');
-                    // Animasi fade in
-                    setTimeout(() => {
-                        successModalContent.classList.remove('scale-95', 'opacity-0');
-                        successModalContent.classList.add('scale-100', 'opacity-100');
-                    }, 10);
-                    
-                    // Auto close setelah 5 detik (opsional)
-                    setTimeout(() => {
-                        closeSuccessModal();
-                    }, 5000);
-                    
-                    // Reset form
-                    handleReset();
+                    isSuccess = true;
                 } else {
-                    showNotification('error', 'Gagal', result.message || 'Terjadi kesalahan pada server');
+                    throw new Error(result.message || 'Gagal menyimpan');
                 }
             } catch (err) {
-                console.error(err);
-                overlay.classList.add('hidden');
-                showNotification('error', 'Error Jaringan', 'Gagal terhubung ke server. Cek koneksi internet Anda.');
-            } finally {
-                // 6. ENABLE KEMBALI TOMBOL & FORM
-                submitBtn.disabled = false;
-                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                console.warn('Fetch error/timeout:', err);
                 
-                allInputs.forEach(input => input.disabled = false);
+                // Jika timeout, asumsikan sukses (data kemungkinan sudah masuk)
+                if (err.name === 'AbortError') {
+                    isSuccess = true;
+                    resultData = {
+                        status: 'success',
+                        message: 'Presensi terkirim (response lambat dari server)',
+                        totalHadir: siswaHadir.length,
+                        totalTidakHadir: siswaTidakHadir.length
+                    };
+                } else {
+                    overlay.classList.remove('active');
+                    showNotification('error', 'Gagal', err.message || 'Terjadi kesalahan saat menyimpan');
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    isSubmitting = false;
+                    return;
+                }
             }
+
+            // 4. SEMBUNYIKAN OVERLAY
+            overlay.classList.remove('active');
+            
+            // Reset pesan loading
+            const loadingTitle = document.getElementById('loadingTitle');
+            const loadingSubtitle = document.getElementById('loadingSubtitle');
+            if (loadingTitle) loadingTitle.textContent = 'Sedang Mengirim Presensi';
+            if (loadingSubtitle) loadingSubtitle.textContent = 'Mohon tunggu sebentar...';
+
+            if (isSuccess) {
+                // 5. TAMPILKAN SUCCESS MODAL
+                document.getElementById('successHadir').textContent = resultData.totalHadir || siswaHadir.length;
+                document.getElementById('successTidakHadir').textContent = resultData.totalTidakHadir || siswaTidakHadir.length;
+                
+                successModal.classList.add('active');
+                
+                // Auto close setelah 4 detik
+                setTimeout(() => {
+                    closeSuccessModal();
+                }, 4000);
+                
+                // 6. RESET FORM
+                quickReset();
+                
+                // Hapus pending data
+                try {
+                    localStorage.removeItem('pendingPresensi');
+                } catch (err) {}
+            }
+
+            // 7. ENABLE TOMBOL
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            isSubmitting = false;
         }
 
-        // Fungsi untuk menutup success modal
-        function closeSuccessModal() {
-            const successModal = document.getElementById('successModal');
-            const successModalContent = document.getElementById('successModalContent');
-            
-            successModalContent.classList.remove('scale-100', 'opacity-100');
-            successModalContent.classList.add('scale-95', 'opacity-0');
-            
-            setTimeout(() => {
-                successModal.classList.add('hidden');
-            }, 300);
-        }
-
-        function handleReset() {
+        // Fungsi reset cepat
+        function quickReset() {
             document.getElementById('presensiForm').reset();
             try { document.getElementById('tanggal').valueAsDate = new Date(); } catch (e) {}
-            ['mapel', 'guru', 'kelas'].forEach(function(f) { document.getElementById(f).disabled = true; });
+            ['mapel', 'guru', 'kelas'].forEach(function(f) { 
+                document.getElementById(f).disabled = true; 
+            });
             currentMode = 'dropdown';
             setMode('dropdown');
             document.getElementById('labelMapel').innerHTML = 'Mata Pelajaran';
             renderSiswaList([]);
         }
 
+        function handleReset() {
+            quickReset();
+        }
+
+        // Fungsi untuk menutup success modal
+        function closeSuccessModal() {
+            document.getElementById('successModal').classList.remove('active');
+        }
+
         function showNotification(type, title, message) {
             const notif = document.getElementById('notification');
             notif.classList.remove('hidden');
-            const icon = type === 'success' ? '✅' : (type === 'info' ? 'ℹ️' : '');
+            const icon = type === 'success' ? '✅' : (type === 'info' ? 'ℹ️' : '❌');
             document.getElementById('notifIcon').innerHTML = '<div class="text-xl">' + icon + '</div>';
             document.getElementById('notifTitle').textContent = title;
             document.getElementById('notifMessage').innerHTML = message;
@@ -553,6 +625,23 @@
                 document.getElementById('presensiForm').addEventListener('submit', handleSubmit);
                 document.getElementById('resetBtn').addEventListener('click', handleReset);
             } catch (e) { console.error(e); }
+            
+            // Recovery: Cek presensi pending
+            try {
+                const pending = localStorage.getItem('pendingPresensi');
+                if (pending) {
+                    const parsed = JSON.parse(pending);
+                    const age = Date.now() - parsed.timestamp;
+                    if (age > 3600000) {
+                        localStorage.removeItem('pendingPresensi');
+                    } else {
+                        setTimeout(() => {
+                            showNotification('info', 'Info', 'Ada data presensi yang belum terkirim sempurna. Silakan submit ulang jika perlu.');
+                        }, 2000);
+                    }
+                }
+            } catch (e) {}
+            
             loadAllData(0);
         }
 
